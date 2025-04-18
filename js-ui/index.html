@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Cat Control</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="cat_ctrl.js" defer></script>
+    </head>
+    <body>
+        <div id="content">
+            <form id="connect-form">
+                <input type="text" id="connect-form-address" value="txt40.local">
+                <input type="text" id="connect-form-key" value="cCBXdy">
+                <input type="button" id="connect-form-submit" value="Connect" onclick="connect()">
+                <span  id="connect-form-status"></span>
+            </form>
+            <img id="camera-img" hidden/>
+            <!--<input type="text" id="msg-input" hidden/>
+            <input type="button" id="msg-send" onclick="sendMsg()" hidden/>-->
+            <!--<canvas id="robot-status" width="200" height="200" hidden></canvas>-->
+            <!--<canvas id="move-joystick" width="200" height="200" hidden></canvas>
+            <canvas id="look-joystick" width="200" height="200" hidden></canvas>-->
+            <!--<svg id="center-dot" width="200" height="200" style="display: none">
+                <circle cx="100" cy="100" r="10" fill="black"/>
+            </svg>-->
+        </div>
+    </body>
+</html>
