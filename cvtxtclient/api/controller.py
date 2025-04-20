@@ -15,11 +15,32 @@ from cvtxtclient.models import (
 )
 from typing import AsyncIterator, List, Optional
 
+
 class ControllerAPI:
-    def __init__(self, config: APIConfig, session: aiohttp.ClientSession):
+    def __init__(self,
+                 config: APIConfig,
+                 session: Optional[aiohttp.ClientSession] = None):
+        """Api client for the controller.
+
+        Parameters
+        ----------
+        config : APIConfig
+            Configuration for the API client.
+
+        session : Optional[aiohttp.ClientSession], optional
+            An optional aiohttp session to use for requests. If not provided, a new session will be created.
+
+        """
         self.config = config
-        self.session = session
+        self._session = session
         self.headers = {}
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        """Returns the aiohttp session for making requests."""
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
 
     def get_headers(self) -> dict:
         """Returns the headers for the API requests."""
@@ -96,9 +117,11 @@ class ControllerAPI:
         try:
             async with self.session.get(url, headers=headers, params=params) as response:
                 if response.status == 200:
-                    boundary = response.headers.get('Content-Type', '').split('boundary=')[-1].strip('"')
+                    boundary = response.headers.get(
+                        'Content-Type', '').split('boundary=')[-1].strip('"')
                     if not boundary:
-                        raise ValueError("Boundary not found in Content-Type header")
+                        raise ValueError(
+                            "Boundary not found in Content-Type header")
 
                     async for chunk, ok in response.content.iter_chunks():
                         if ok:
@@ -106,7 +129,8 @@ class ControllerAPI:
                             parts = chunk.split(b'--' + boundary.encode())
                             for part in parts:
                                 if part.startswith(b'\r\nContent-Type: image/jpeg\r\n\r\n') and part.endswith(b'\r\n'):
-                                    image_data = part[len(b'\r\nContent-Type: image/jpeg\r\n\r\n'):-len(b'\r\n')]
+                                    image_data = part[len(
+                                        b'\r\nContent-Type: image/jpeg\r\n\r\n'):-len(b'\r\n')]
                                     if image_data:
                                         yield image_data
                 elif response.status == 400:
@@ -125,7 +149,7 @@ class ControllerAPI:
     async def stop_camera(self):
         """Stops the video stream of the camera."""
         url = f"{self.config.base_url}/controller/camera/stop"
-        async with self.session.post(url, headers=self.get_headers()) as response:
+        async with self.session.delete(url, headers=self.get_headers()) as response:
             if response.status == 200:
                 return  # OK
             elif response.status == 400:
@@ -272,7 +296,7 @@ class ControllerAPI:
             else:
                 raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
 
-    async def reset_controller_counter_by_id(self, controller_id: int, counter_id: int):
+    async def update_controller_counter_by_id(self, controller_id: int, counter_id: int):
         """Resets a counter with the specified ID."""
         url = f"{self.config.base_url}/controller/{controller_id}/counters/{counter_id}"
         async with self.session.patch(url, headers=self.get_headers()) as response:
@@ -317,56 +341,10 @@ class ControllerAPI:
             else:
                 raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
 
-    async def get_controller_motors(self, controller_id: int) -> List[Motor]:
-        """Returns a list of all initialized motors."""
-        url = f"{self.config.base_url}/controller/{controller_id}/motors"
-        async with self.session.get(url, headers=self.get_headers()) as response:
-            if response.status == 200:
-                data = await response.json()
-                return [Motor(**item) for item in data]
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 404:
-                raise NotFoundError(f"Not Found: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
-
-    async def add_controller_motors(self, controller_id: int, motors: List[Motor]):
-        """Initializes a list of motors."""
-        url = f"{self.config.base_url}/controller/{controller_id}/motors"
-        payload = [motor.model_dump(by_alias=True) for motor in motors]
-        async with self.session.post(url, headers=self.get_headers(), json=payload) as response:
-            if response.status == 200:
-                return  # OK
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
-
-    async def get_controller_motor_by_id(self, controller_id: int, motor_id: int) -> Motor:
-        """Returns a motor with the specified ID."""
-        url = f"{self.config.base_url}/controller/{controller_id}/motors/{motor_id}"
-        async with self.session.get(url, headers=self.get_headers()) as response:
-            if response.status == 200:
-                data = await response.json()
-                return Motor(**data)
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 404:
-                raise NotFoundError(f"Not Found: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
-
-    async def set_controller_motor_by_id(self, controller_id: int, motor_id: int, motor: Motor):
+    async def update_controller_motor_by_id(self, controller_id: int, motor_id: int, motor: Motor):
         """Sets the configuration of a motor with the specified ID."""
         url = f"{self.config.base_url}/controller/{controller_id}/motors/{motor_id}"
-        async with self.session.patch(url, headers=self.get_headers(), json=motor.model_dump(by_alias=True)) as response:
+        async with self.session.post(url, headers=self.get_headers(), json=motor.model_dump(by_alias=True)) as response:
             if response.status == 200:
                 return  # OK
             elif response.status == 400:
@@ -378,56 +356,11 @@ class ControllerAPI:
             else:
                 raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
             
-    async def get_controller_servomotors(self, controller_id: int) -> List[Servomotor]:
-        """Returns a list of all initialized servomotors."""
-        url = f"{self.config.base_url}/controller/{controller_id}/servomotors"
-        async with self.session.get(url, headers=self.get_headers()) as response:
-            if response.status == 200:
-                data = await response.json()
-                return [Servomotor(**item) for item in data]
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 404:
-                raise NotFoundError(f"Not Found: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
 
-    async def add_controller_servomotors(self, controller_id: int, servomotors: List[Servomotor]):
-        """Initializes a list of servomotors."""
-        url = f"{self.config.base_url}/controller/{controller_id}/servomotors"
-        payload = [servomotor.model_dump(by_alias=True) for servomotor in servomotors]
-        async with self.session.post(url, headers=self.get_headers(), json=payload) as response:
-            if response.status == 200:
-                return  # OK
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
-
-    async def get_controller_servomotor_by_id(self, controller_id: int, servomotor_id: int) -> Servomotor:
-        """Returns a servomotor with the specified ID."""
-        url = f"{self.config.base_url}/controller/{controller_id}/servomotors/{servomotor_id}"
-        async with self.session.get(url, headers=self.get_headers()) as response:
-            if response.status == 200:
-                data = await response.json()
-                return Servomotor(**data)
-            elif response.status == 400:
-                raise BadRequestError(f"Bad Request: {await response.text()}")
-            elif response.status == 404:
-                raise NotFoundError(f"Not Found: {await response.text()}")
-            elif response.status == 500:
-                raise InternalServerError(f"Internal Server Error: {await response.text()}")
-            else:
-                raise UnexpectedError(f"Unexpected Error: {response.status}", response.status, await response.text())
-
-    async def set_controller_servomotor_by_id(self, controller_id: int, servomotor_id: int, servomotor: Servomotor):
+    async def update_controller_servomotor_by_id(self, controller_id: int, servomotor_id: int, servomotor: Servomotor):
         """Sets the configuration of a servomotor with the specified ID."""
         url = f"{self.config.base_url}/controller/{controller_id}/servomotors/{servomotor_id}"
-        async with self.session.patch(url, headers=self.get_headers(), json=servomotor.model_dump(by_alias=True)) as response:
+        async with self.session.post(url, headers=self.get_headers(), json=servomotor.model_dump(by_alias=True)) as response:
             if response.status == 200:
                 return  # OK
             elif response.status == 400:

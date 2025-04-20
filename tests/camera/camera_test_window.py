@@ -29,23 +29,32 @@ class ImageStreamReceiver(QThread):
         self._session = None
         self._controller_api = None
         self._event_loop = None
+        self._receive_stream_task: Optional[asyncio.Task] = None
 
     def start_stream(self):
-        self._running = True
         self.start() # Start the QThread, which will execute the run method
 
     def stop(self):
-        self._running = False
         if self._event_loop and self._event_loop.is_running():
-            asyncio.run_coroutine_threadsafe(self._stop_stream_api(), self._event_loop)
+            asyncio.run_coroutine_threadsafe(self._stop_and_exit(), self._event_loop)
         else:
-            asyncio.run(self._stop_stream_api()) # Fallback if loop isn't running yet
+            asyncio.run(self._stop_and_exit()) # Fallback if loop isn't running yet
+
+    async def _stop_and_exit(self):
+        await self._stop_stream_api()
+        self._stop_thread_loop()
 
     def run(self):
         self._event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._event_loop)
-        self._event_loop.create_task(self._receive_stream()) # Create a task, don't run and close the loop
-        self._event_loop.run_forever() # Keep the loop running
+        self._receive_stream_task = self._event_loop.create_task(self._receive_stream())
+        self._event_loop.run_forever() 
+
+    async def _stop_session(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+            self._controller_api = None
 
     async def _start_stream_api(self):
         self._session = aiohttp.ClientSession()
@@ -60,6 +69,17 @@ class ImageStreamReceiver(QThread):
     async def _stop_stream_api(self):
         if self._controller_api and self._session:
             try:
+                # Check if receiver is running before stopping
+                if self._running:
+                    # Set running to False to trigger the stop
+                    self._running = False
+                    # Wait for the receiver to finish
+                    if self._receive_stream_task:
+                        await asyncio.wait_for(self._receive_stream_task, timeout=3)
+                        # Ceck if still running, if so, stop the stream
+                        if not self._receive_stream_task.done():
+                            self._receive_stream_task.cancel()
+
                 await asyncio.wait_for(self._controller_api.stop_camera(), timeout=10)
                 self.stream_stopped.emit(True, "Camera stream stopped successfully.")
             except asyncio.TimeoutError:
@@ -67,25 +87,20 @@ class ImageStreamReceiver(QThread):
             except Exception as e:
                 self.stream_stopped.emit(False, f"Error stopping camera stream: {e}")
             finally:
-                if self._session and not self._session.closed:
-                    await self._session.close()
-                    self._session = None
-                    self._controller_api = None
+                await self._stop_session()
         self._running = False
         self.stream_stopped.emit(True, "Stream receiver thread finished.")
 
-    async def _stop_thread_loop(self):
+    def _stop_thread_loop(self):
         if self._event_loop and self._event_loop.is_running():
             self._event_loop.stop()
 
     async def _receive_stream(self):
-        
         await self._start_stream_api() # Call start API here, within the thread's loop
-
         if not self._controller_api or not self._session:
             self.stream_error.emit("API client or session not initialized.")
             return
-
+        self._running = True
         try:
             async for frame_bytes in self._controller_api.camera_image_stream():
                 if not self._running:
@@ -98,13 +113,11 @@ class ImageStreamReceiver(QThread):
         except Exception as e:
             if self._running:
                 self._event_loop.call_soon_threadsafe(self.stream_error.emit, f"Error receiving image stream: {e}")
+                # Call stop
+                self._running = False
+                await self._stop_and_exit()
         finally:
             print("Image stream receiver loop finished.")
-            if self._session and not self._session.closed:
-                await self._session.close()
-                self._session = None
-                self._controller_api = None
-            self._running = False
             self.stream_stopped.emit(True, "Stream receiver thread finished.")
 
 class MainWindow(QMainWindow):

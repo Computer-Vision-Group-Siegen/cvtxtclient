@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "cvtxtclient"
 version = "0.1.0"
-description = ""
+description = "Api client for the FT TXT REST API."
 authors = ["Jan Philipp Schneider <jp-schneider@users.noreply.github.com>"]
 readme = "README.md"
 
@@ -9,7 +9,10 @@ readme = "README.md"
 python = "^3.10"
 aiohttp = "^3.11.17"
 pydantic = "^2.11.3"
+python-dotenv = "^1.1.0"
 
+[tool.poetry.group.dev.dependencies]
+pyqt5-qt5 = "=5.15.2"
 
 [build-system]
 requires = ["poetry-core"]
