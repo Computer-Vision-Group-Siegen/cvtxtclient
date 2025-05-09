@@ -1,0 +1,16 @@
+aiohappyeyeballs
+aiohttp
+aiosignal
+annotated-types
+async-timeout
+attrs
+frozenlist
+idna
+multidict
+propcache
+pydantic-core
+pydantic
+python-dotenv
+typing-extensions
+typing-inspection
+yarl
