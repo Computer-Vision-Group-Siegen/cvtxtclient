@@ -1,0 +1,22 @@
+repos:
+-   repo: https://github.com/Computer-Vision-Group-Siegen/cvtools
+    rev: v0.0.1
+    hooks:
+    - id: alter-requirements
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: mixed-line-ending
+-   repo: https://github.com/hhatto/autopep8
+    rev: v2.1.0
+    hooks:
+    -   id: autopep8
+-   repo: https://github.com/python-poetry/poetry
+    rev: '1.8.2'
+    hooks:
+    -   id: poetry-check
+    -   id: poetry-lock
+    -   id: poetry-export
+    -   id: poetry-install

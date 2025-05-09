@@ -13,6 +13,7 @@ python-dotenv = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pyqt5-qt5 = "=5.15.2"
+pre-commit = "^4.2.0"
 
 [build-system]
 requires = ["poetry-core"]
