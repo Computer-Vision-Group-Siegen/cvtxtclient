@@ -39,7 +39,8 @@ class ControllerAPI:
     def session(self) -> aiohttp.ClientSession:
         """Returns the aiohttp session for making requests."""
         if self._session is None:
-            self._session = aiohttp.ClientSession()
+            connector = aiohttp.TCPConnector(force_close=True)
+            self._session = aiohttp.ClientSession(connector=connector)
         return self._session
 
     def get_headers(self) -> dict:
